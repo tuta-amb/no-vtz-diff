@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>100k-line diff, no virtualization</title>
+<style>
+:root{--lh:20px;--gutter-w:56px;--fg:#c9d1d9;--bg:#0d1117;--mut:#8b949e;--add-bg:rgba(46,160,67,.12);--del-bg:rgba(248,81,73,.12);--add-fg:#3fb950;--del-fg:#f85149}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.5 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+header{position:sticky;top:0;z-index:10;background:#161b22;border-bottom:1px solid #30363d;padding:8px 16px;display:flex;gap:16px;align-items:baseline}
+header b{color:#fff}header span{color:var(--mut)}
+#stats{margin-left:auto;font:12px/1.4 ui-monospace,monospace;color:var(--mut);white-space:pre}
+.file{margin:16px;border:1px solid #30363d;border-radius:6px;overflow:hidden}
+.fhead{position:sticky;top:41px;z-index:5;background:#161b22;border-bottom:1px solid #30363d;padding:6px 12px;font:12px/1.6 ui-monospace,monospace;display:flex;gap:12px}
+.fhead .path{color:#fff}.fhead .plus{color:var(--add-fg)}.fhead .minus{color:var(--del-fg)}
+/* Chunk wrappers carry content-visibility; far fewer CV elements than per-row */
+.chunk{content-visibility:auto;contain-intrinsic-size:auto calc(200*var(--lh))}
+.l{display:flex;font:12px/var(--lh) ui-monospace,SFMono-Regular,Menlo,monospace;min-height:var(--lh);position:relative}
+.l .g{flex:0 0 var(--gutter-w);text-align:right;padding-right:8px;color:var(--mut);user-select:none;opacity:.6}
+.l .s{flex:0 0 16px;text-align:center;user-select:none}
+.l .c{flex:1;white-space:pre;padding-right:16px}
+.l.ctx .s::before{content:" "}
+.l.add{background:var(--add-bg)}.l.add .s::before{content:"+";color:var(--add-fg)}
+.l.del{background:var(--del-bg)}.l.del .s::before{content:"-";color:var(--del-fg)}
+.l.hunk{background:#161b22;color:var(--mut)}
+.l:hover{outline:1px solid #388bfd66;outline-offset:-1px}
+.l:target,.l.jump{outline:2px solid #d29922;outline-offset:-2px}
+/* CSS Custom Highlight API ::highlight pseudo-elements (no token spans) */
+::highlight(syn-kw){color:#ff7b72}
+::highlight(syn-str){color:#a5d6ff}
+::highlight(syn-num){color:#79c0ff}
+::highlight(syn-com){color:#8b949e;font-style:italic}
+::highlight(syn-type){color:#ffa657}
+::highlight(del-word){background:rgba(248,81,73,.45);border-radius:2px}
+::highlight(ins-word){background:rgba(46,160,67,.45);border-radius:2px}
+/* single floating toolbar, moved into hovered row on demand */
+#toolbar{display:none;position:fixed;top:0;left:0;z-index:6;gap:4px;will-change:transform}
+#toolbar.on{display:flex}
+#toolbar button{background:#21262d;border:1px solid #30363d;border-radius:4px;color:var(--fg);font:11px/1 ui-monospace,monospace;padding:3px 7px;cursor:pointer}
+#toolbar button:hover{background:#30363d}
+.comment{margin:2px 0 2px calc(2*var(--gutter-w) + 16px);background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px;font:12px/1.5 ui-monospace,monospace}
+.comment textarea{width:100%;min-height:54px;background:#0d1117;color:var(--fg);border:1px solid #30363d;border-radius:4px;font:inherit;padding:6px;resize:vertical}
+.comment .row{display:flex;gap:8px;margin-top:6px;align-items:center}
+.comment button{background:#238636;border:none;border-radius:4px;color:#fff;padding:4px 10px;cursor:pointer}
+.comment button.ghost{background:#21262d;border:1px solid #30363d;color:var(--fg)}
+.comment .saved{color:var(--mut)}
+.l .badge{position:absolute;right:8px;top:3px;font-size:10px;color:#d29922;user-select:none}
+.cmtlist div{border-top:1px solid #21262d;padding:4px 0;color:var(--fg)}
+</style>
+</head>
+<body>
+<header><b>diff / no-virtualization</b><span id="summary"></span><span id="stats">measuring…</span></header>
+<main id="root"></main>
+<div id="toolbar"><button data-act="link">link</button><button data-act="comment">comment</button></div>
+<script>
+"use strict";
+/* ---------- deterministic fixture: ~100k-line diff, generated client-side ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd=mulberry32(1337);
+const pick=a=>a[rnd()*a.length|0];
+const KW=["const","let","function","return","await","async","if","else","for","while","import","export","class","extends","new","throw","try","catch","switch","case","default","typeof","yield","static","get","set"];
+const TY=["User","Session","Config","Request","Response","Options","Context","Buffer","Handler","Result","Token","Cache","Store","Client","Server","Event","State","Node","Edge","Query"];
+const FN=["fetchUser","parseConfig","initCache","handleRequest","validateToken","renderPage","loadModule","syncState","buildQuery","flushBuffer","resolvePath","emitEvent","computeHash","decodePayload","mergeOptions","scheduleTask","drainQueue","openSocket","closeStream","retryWith"];
+const VR=["config","ctx","result","buffer","cache","state","node","req","res","opts","token","idx","acc","tmp","queue","store","client","payload","entry","cursor"];
+const STR=["/api/v2/users","application/json","utf-8","ECONNRESET","default","strict","/var/lib/cache","user:settings","text/plain","px-4 py-2","Bearer ","en-US","0x1F","idle","production","./utils.mjs","text-diff","X-Request-Id","index.html","light"];
+function codeLine(){
+  const t=rnd(), id=()=>pick(VR), num=()=>1+(rnd()*500|0), str=()=>'"'+pick(STR)+'"', ty=pick(TY), fn=pick(FN), kw=pick(KW);
+  const ind="  ".repeat(rnd()*4|0);
+  if(t<.06)return ind+"// "+pick(["TODO: tighten this","refactor later","hotfix, see #4821","mirrors Go impl","deprecated path","perf: avoid copy","sync with schema","review before merge"]);
+  if(t<.12)return "import { "+fn+" } from "+str()+";";
+  if(t<.18)return ind+"export async function "+fn+"("+id()+": "+ty+"): Promise<"+pick(TY)+"> {";
+  if(t<.24)return ind+"const "+id()+" = await "+fn+"("+id()+", { retries: "+num()+" });";
+  if(t<.30)return ind+"if ("+id()+"."+pick(["length","ok","status","code"])+" "+pick(["===","!==",">","<"])+" "+num()+") {";
+  if(t<.36)return ind+"return "+id()+" ? "+fn+"("+id()+") : null;";
+  if(t<.42)return ind+id()+"."+fn+"("+str()+", "+num()+");";
+  if(t<.48)return ind+"throw new Error(`"+pick(STR)+" failed: ${"+id()+".message}`);";
+  if(t<.54)return ind+"for (const "+id()+" of "+pick(VR)+"s) {";
+  if(t<.60)return ind+"}";
+  if(t<.66)return ind+"const "+id()+": "+ty+" = { id: "+num()+", label: "+str()+" };";
+  if(t<.72)return ind+"export const "+id().toUpperCase()+"_"+(num()%90)+" = "+num()+";";
+  if(t<.78)return ind+"await Promise.all("+id()+".map(("+pick(VR)+") => "+fn+"("+pick(VR)+")));";
+  if(t<.84)return ind+"console."+pick(["log","warn","error"])+"("+str()+", "+id()+");";
+  if(t<.92)return ind+kw+" "+id()+" = "+fn+"("+id()+", "+str()+");";
+  return ind+"}"
+}
+/* word-diff via common prefix/suffix on a changed pair */
+function pairDiff(a,b){
+  let p=0; const al=a.length, bl=b.length;
+  while(p<al&&p<bl&&a[p]===b[p])p++;
+  let s=0; while(s<al-p&&s<bl-p&&a[al-1-s]===b[bl-1-s])s++;
+  return {a:[p,al-s],b:[p,bl-s]};
+}
+/* simple regex tokenizer -> [start,len,type] per line, built at generation time */
+const TOK_RE=/(\/\/[^\n]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|\b(\d+(?:\.\d+)?)\b|\b(const|let|var|function|return|await|async|if|else|for|while|of|import|from|export|class|extends|new|throw|try|catch|typeof|Promise)\b|\b([A-Z][A-Za-z0-9_]+)\b/g;
+function tokenize(src){
+  const out=[]; TOK_RE.lastIndex=0; let m;
+  while((m=TOK_RE.exec(src))){
+    if(m[1]!=null)out.push([m.index,m[1].length,"syn-com"]);
+    else if(m[2]!=null)out.push([m.index,m[2].length,"syn-str"]);
+    else if(m[3]!=null)out.push([m.index,m[3].length,"syn-num"]);
+    else if(m[4]!=null)out.push([m.index,m[4].length,"syn-kw"]);
+    else if(m[5]!=null)out.push([m.index,m[5].length,"syn-type"]);
+  }
+  return out;
+}
+const FILES=36, CHUNK=200, TARGET=106000;
+const perFile=Math.ceil(TARGET/FILES);
+const root=document.getElementById("root");
+const toolbar=document.getElementById("toolbar");
+const t0=performance.now();
+const heap0=performance.memory?performance.memory.usedJSHeapSize:0;
+let totalLines=0,totalAdd=0,totalDel=0,totalTok=0,totalWord=0;
+const pendingTok=[];   // {line, tok, text, kind, word?}
+const lineMeta=new Map(); // id -> {kind, file, oldNo, newNo}
+let oldNo=0,newNo=0;
+const frag=document.createDocumentFragment();
+for(let f=0;f<FILES;f++){
+  const adds=[]; // pending added lines awaiting pairing with previous del
+  const path="src/"+pick(["core","api","ui","net","db","util"])+"/"+pick(FN)+"_"+f+".ts";
+  const lines=[];
+  let n=0; oldNo=0; newNo=0;
+  while(n<perFile){
+    const hunkSize=8+(rnd()*30|0);
+    lines.push({k:"hunk",t:"@@ -"+(oldNo+1)+","+hunkSize+" +"+(newNo+1)+","+hunkSize+" @@ "+pick(FN)+"()"});
+    n++;
+    let i=0;
+    while(i<hunkSize&&n<perFile){
+      const r=rnd();
+      if(r<.62){const t=codeLine();lines.push({k:"ctx",t,on:++oldNo,nn:++newNo});i++;n++;}
+      else if(r<.81){const t=codeLine();lines.push({k:"del",t,on:++oldNo,nn:0});i++;n++;
+        if(rnd()<.75){const t2=codeLine();lines.push({k:"add",t:t2,pair:lines.length-1,on:0,nn:++newNo});i++;n++;}}
+      else{const t=codeLine();lines.push({k:"add",t,on:0,nn:++newNo});i++;n++;}
+    }
+  }
+  // build HTML string for the file; collect token/word ranges
+  const toks=[]; let html="";
+  const counts={add:0,del:0}; let lastDelTok=-1;
+  for(let ci=0;ci<lines.length;ci+=CHUNK){
+    let chunk="";
+    for(let li=ci;li<Math.min(ci+CHUNK,lines.length);li++){
+      const L=lines[li];
+      if(L.k==="hunk"){chunk+='<div class="l hunk"><span class="g"></span><span class="g"></span><span class="s"></span><span class="c">'+esc(L.t)+'</span></div>';continue;}
+      const isAdd=L.k==="add", isDel=L.k==="del";
+      if(isAdd){counts.add++;totalAdd++} if(isDel){counts.del++;totalDel++}
+      totalLines++;
+      const gid=totalLines;
+      chunk+='<div class="l '+L.k+'" id="L'+gid+'" data-i="'+gid+'"><span class="g">'+(L.on||"")+'</span><span class="g">'+(L.nn||"")+'</span><span class="s"></span><span class="c">'+esc(L.t)+'</span></div>';
+      const tk=tokenize(L.t); totalTok+=tk.length;
+      toks.push({line:gid,tok:tk,text:L.t,kind:L.k});
+      lastDelTok=isDel?toks.length-1:-1;
+      if(isAdd&&L.pair!=null){
+        const d=lines[L.pair]; const {a,b}=pairDiff(d.t,L.t);
+        if(a[1]>a[0]&&b[1]>b[0]){totalWord+=2;
+          toks[toks.length-1].word=[b[0],b[1],"ins-word"];
+          if(lastDelTok>=0)toks[lastDelTok].word=[a[0],a[1],"del-word"];
+        }
+      }
+    }
+    html+='<div class="chunk">'+chunk+'</div>';
+  }
+  const sec=document.createElement("section");sec.className="file";sec.id="file-"+f;
+  sec.innerHTML='<div class="fhead"><span class="path">'+path+'</span><span class="plus">+'+counts.add+'</span><span class="minus">-'+counts.del+'</span></div>'+html;
+  frag.appendChild(sec);
+  pendingTok.push(...toks);
+}
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+const tGen=performance.now();
+root.appendChild(frag);
+const tMount=performance.now();
+/* wire token ranges to real text nodes (one walk, batched) */
+const byLine=[]; // map generation index -> row element
+root.querySelectorAll(".l[data-i]").forEach(el=>{byLine[+el.dataset.i]=el});
+const hlGroups={"syn-com":[],"syn-str":[],"syn-num":[],"syn-kw":[],"syn-type":[],"del-word":[],"ins-word":[]};
+const HLS={};for(const g of["syn-com","syn-str","syn-num","syn-kw","syn-type","del-word","ins-word"]){HLS[g]=new Highlight();CSS.highlights.set(g,HLS[g])}
+let regMs=0;
+function registerAll(done){
+  const SLICE=5000; let i=0;
+  function step(){
+    const t=performance.now();
+    const end=Math.min(i+SLICE,pendingTok.length);
+    for(;i<end;i++){
+      const e=pendingTok[i];
+      const row=byLine[e.line]; if(!row)continue;
+      const c=row.lastElementChild.firstChild; if(!c)continue;
+      for(const[s,l,g]of e.tok){const r=new Range();r.setStart(c,s);r.setEnd(c,Math.min(s+l,c.length));HLS[g].add(r)}
+      if(e.word){const r=new Range();r.setStart(c,e.word[0]);r.setEnd(c,Math.min(e.word[1],c.length));HLS[e.word[2]].add(r)}
+    }
+    regMs+=performance.now()-t;
+    if(i<pendingTok.length){if(i%25000===0)console.log("reg progress",i,"regMs",regMs.toFixed(0));setTimeout(step,0)}
+    else{console.log("register done", regMs.toFixed(0));done()}
+  }
+  step();
+}
+console.log("gen done", (tGen-t0).toFixed(0), "mount", (tMount-tGen).toFixed(0));
+/* stats: first paint measured right after mount; highlight fill reported when done */
+requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  const nodes=document.getElementsByTagName("*").length;
+  const heap1=performance.memory?performance.memory.usedJSHeapSize:0;
+  window.__firstPaint={gen:(tGen-t0),mount:(tMount-tGen),nodes,heapMB:(heap1-heap0)/1048576};
+  document.getElementById("stats").textContent=
+    "lines "+totalLines.toLocaleString()+" | dom nodes "+nodes.toLocaleString()+"\n"+
+    "gen "+(tGen-t0).toFixed(0)+"ms | mount "+(tMount-tGen).toFixed(0)+"ms | first paint ~"+((tMount-t0)).toFixed(0)+"ms\n"+
+    "heap +"+((heap1-heap0)/1048576).toFixed(1)+"MB | highlighting "+(totalTok+totalWord).toLocaleString()+" ranges…";
+}));
+registerAll(()=>{
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const nodes=document.getElementsByTagName("*").length;
+    const heap1=performance.memory?performance.memory.usedJSHeapSize:0;
+    window.__final={regMs,nodes,heapMB:(heap1-heap0)/1048576,ranges:totalTok+totalWord};
+    document.getElementById("stats").textContent=
+      "lines "+totalLines.toLocaleString()+" | dom nodes "+nodes.toLocaleString()+"\n"+
+      "gen "+(tGen-t0).toFixed(0)+"ms | mount "+(tMount-tGen).toFixed(0)+"ms | highlights "+regMs.toFixed(0)+"ms\n"+
+      "heap +"+((heap1-heap0)/1048576).toFixed(1)+"MB | ranges "+(totalTok+totalWord).toLocaleString()+" | heap done";
+  }));
+});
+document.getElementById("summary").textContent=FILES+" files, +"+totalAdd.toLocaleString()+" -"+totalDel.toLocaleString()+", no virtualization, native ctrl-f works";
+/* ONE delegated listener set on the container */
+let hoverRow=null;
+root.addEventListener("mouseover",e=>{
+  if(e.target.closest&&e.target.closest("#toolbar"))return;
+  const row=e.target.closest&&e.target.closest(".l");
+  if(row===hoverRow)return; hoverRow=row;
+  if(!row){toolbar.classList.remove("on");return}
+  const r=row.getBoundingClientRect();
+  toolbar.style.transform="translate("+(r.right-120)+"px,"+(r.top+2)+"px)";
+  toolbar.classList.add("on");
+});
+root.addEventListener("click",e=>{
+  const btn=e.target.closest&&e.target.closest("#toolbar button");
+  if(btn){
+    const row=hoverRow;
+    if(btn.dataset.act==="link"){location.hash=row.id;navigator.clipboard&&navigator.clipboard.writeText(location.href).catch(()=>{})}
+    if(btn.dataset.act==="comment"){openComment(row)}
+    return;
+  }
+  const g=e.target.closest&&e.target.closest(".l .g");
+  if(g){openComment(g.closest(".l"));return}
+  const act=e.target.closest&&e.target.closest("[data-cact]");
+  if(act){
+    const box=act.closest(".comment");
+    if(act.dataset.cact==="save"){
+      const ta=box.querySelector("textarea"); const txt=ta.value.trim();
+      const list=box.querySelector(".cmtlist");
+      if(txt){const d=document.createElement("div");d.textContent=txt;list.appendChild(d);
+        const row=box.previousElementSibling;
+        if(row&&row.classList.contains("l")&&!row.querySelector(".badge")){const b=document.createElement("span");b.className="badge";b.textContent="●";row.appendChild(b)}}
+      ta.value="";
+    }
+    if(act.dataset.cact==="close"){box.remove();toolbar.classList.remove("on")}
+  }
+});
+function openComment(row){
+  if(!row||row.nextElementSibling&&row.nextElementSibling.classList.contains("comment"))return;
+  const box=document.createElement("div"); box.className="comment";
+  box.innerHTML='<div class="cmtlist"></div><textarea placeholder="Leave a comment on '+row.id+'"></textarea><div class="row"><button data-cact="save">comment</button><button data-cact="close" class="ghost">close</button><span class="saved">'+row.id+'</span></div>';
+  row.after(box); box.querySelector("textarea").focus();
+}
+/* anchor links: native # works since all ids exist in DOM; re-scroll on hashchange */
+addEventListener("hashchange",()=>{const el=document.getElementById(location.hash.slice(1));if(el){el.scrollIntoView({block:"center"});el.classList.add("jump");setTimeout(()=>el.classList.remove("jump"),1500)}});
+if(location.hash){const el=document.getElementById(location.hash.slice(1));if(el)el.scrollIntoView({block:"center"})}
+</script>
+</body>
+</html>
